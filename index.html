@@ -482,6 +482,7 @@
       const isLocalBackend = apiOrigin.protocol === "http:" &&
         ["localhost", "127.0.0.1", "[::1]"].includes(apiOrigin.hostname);
       if ((apiOrigin.protocol !== "https:" && !isLocalBackend) ||
+          !apiOrigin.hostname || apiOrigin.username || apiOrigin.password ||
           apiOrigin.pathname !== "/" || apiOrigin.search || apiOrigin.hash) {
         setImportStatus("The backend URL must be an HTTPS origin, or a loopback HTTP URL for local testing, without a path.", "error");
         return;
@@ -504,7 +505,10 @@
           throw new Error("The import service returned an unreadable response.");
         }
         if (!response.ok) {
-          throw new Error(result.error?.message || "The product could not be imported. Please try again.");
+          const message = typeof result?.error?.message === "string"
+            ? result.error.message
+            : "The product could not be imported. Please try again.";
+          throw new Error(message);
         }
         const product = result.product;
         if (!product || typeof product.title !== "string" ||
@@ -516,9 +520,11 @@
         }
         showImportPreview(product);
       } catch (error) {
-        setImportStatus(error.name === "TimeoutError"
+        setImportStatus(error?.name === "TimeoutError"
           ? "The product lookup timed out. Please try again."
-          : error.message || "The product could not be imported. Check the backend and try again.", "error");
+          : error instanceof TypeError
+            ? "Could not reach the import backend. Check that the service is running, IMPORT_API_URL is correct, and the backend allows this website."
+            : error?.message || "The product could not be imported. Check the backend and try again.", "error");
       } finally {
         importButton.disabled = false;
         importButton.textContent = "Fetch product";
